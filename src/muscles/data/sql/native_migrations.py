@@ -4,12 +4,17 @@ from __future__ import annotations
 import hashlib
 from contextlib import contextmanager
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
+from pathlib import PurePosixPath
 from types import ModuleType
-from typing import Callable
+from typing import TYPE_CHECKING, Callable, Iterable
 from urllib.parse import unquote
 
 from .native import SqlDatabase, SqlTransaction
+
+if TYPE_CHECKING:
+    from muscles.data.migrations import MigrationRegistry
 
 
 @dataclass(frozen=True)
@@ -198,3 +203,86 @@ class NativeSqlMigrationSourceBackend:
             }
         finally:
             database.close()
+
+
+def _register_native_sql_migrations(
+    registry: MigrationRegistry,
+    package_classes: Iterable[type],
+    database_url: str | None,
+    *,
+    pattern: str = "migrate/000[0-9]_*.py",
+) -> None:
+    """Discover package migrations and derive source dependencies from package metadata."""
+    from muscles.data.migrations import MigrationSource, discover_migration_modules
+
+    directory_parts = PurePosixPath(pattern).parent.parts
+    if not directory_parts or any(not part.isidentifier() for part in directory_parts):
+        raise ValueError("Native SQL migration pattern must include a package directory")
+    discovered = []
+
+    for package_class in package_classes:
+        class_module = getattr(package_class, "__module__", "")
+        package_name = class_module.rpartition(".")[0]
+        if not package_name:
+            continue
+        migration_package = f"{package_name}.{'.'.join(directory_parts)}"
+        try:
+            migration_package_spec = find_spec(migration_package)
+        except ModuleNotFoundError as exc:
+            if exc.name == migration_package:
+                continue
+            raise
+        if migration_package_spec is None:
+            continue
+
+        namespace = getattr(package_class, "namespace", None)
+        if not isinstance(namespace, str) or not namespace:
+            raise ValueError(f"Package {package_class.__name__} has no namespace")
+        modules = discover_migration_modules(package_name, pattern=pattern)
+        if not modules:
+            raise ValueError(
+                f"No SQL migrations found for package {namespace!r} matching {pattern!r}"
+            )
+        if not database_url:
+            raise ValueError(
+                f"Package {package_class.__name__} migrations require the 'database' resource"
+            )
+
+        migrations = [NativeSqlMigration.from_module(module) for module in modules]
+        discovered.append((namespace, package_class, migrations))
+
+    migration_names = {namespace for namespace, _, _ in discovered}
+    for namespace, package_class, migrations in discovered:
+        dependencies = tuple(
+            dependency
+            for dependency in getattr(package_class, "dependencies", ())
+            if dependency in migration_names
+        )
+        registry.register(MigrationSource(
+            namespace,
+            NativeSqlMigrationSourceBackend(database_url, namespace, migrations),
+            depends_on=dependencies,
+        ))
+
+
+def build_native_sql_migration_registry(
+    package_classes: Iterable[type],
+    database_url: str | None,
+    *,
+    pattern: str = "migrate/000[0-9]_*.py",
+) -> MigrationRegistry:
+    """Build a registry and SQL lock, deriving source order from package dependencies."""
+    from muscles.data.migrations import MigrationRegistry
+    from .migration_lock import SqlMigrationExecutionLock
+
+    registry = MigrationRegistry(
+        execution_lock=SqlMigrationExecutionLock(database_url) if database_url else None,
+    )
+    _register_native_sql_migrations(
+        registry,
+        package_classes,
+        database_url,
+        pattern=pattern,
+    )
+    registry.ordered()
+    return registry

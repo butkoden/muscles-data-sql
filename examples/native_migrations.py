@@ -2,8 +2,8 @@
 
 Run from muscles-data-sql with PYTHONPATH=src:../muscles/src:../muscles-data/src.
 """
-from muscles_data import MigrationRegistry, MigrationSource, discover_migration_modules
-from muscles_data_sql import NativeSqlMigration, NativeSqlMigrationBackend, SqlDatabase
+from muscles.data import MigrationRegistry, MigrationSource, discover_migration_modules
+from muscles.data.sql import NativeSqlMigration, NativeSqlMigrationBackend, SqlDatabase
 
 
 def main():

@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .native_migrations import NativeSqlMigration, NativeSqlMigrationBackend, NativeSqlMigrationSourceBackend
+    from .native_migrations import (
+        NativeSqlMigration,
+        NativeSqlMigrationBackend,
+        NativeSqlMigrationSourceBackend,
+        build_native_sql_migration_registry,
+    )
     from .drivers import SqlDriverCatalog
     from .native import SqlDatabase, SqlTransaction
     from .model_mapper import ModelMapper
@@ -22,6 +27,7 @@ __all__ = [
     "NativeSqlMigration",
     "NativeSqlMigrationBackend",
     "NativeSqlMigrationSourceBackend",
+    "build_native_sql_migration_registry",
     "SqlDriverCatalog",
     "SqlDatabase",
     "SqlTransaction",
@@ -43,7 +49,12 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name in {"NativeSqlMigration", "NativeSqlMigrationBackend", "NativeSqlMigrationSourceBackend"}:
+    if name in {
+        "NativeSqlMigration",
+        "NativeSqlMigrationBackend",
+        "NativeSqlMigrationSourceBackend",
+        "build_native_sql_migration_registry",
+    }:
         from . import native_migrations
 
         return getattr(native_migrations, name)

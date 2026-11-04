@@ -5,7 +5,8 @@ Muscles SQL is a data layer package for SQL databases:
 - engine and session management
 - repository CRUD and advanced query API (filters/operators/joins/aggregates)
 - transactions and Unit of Work (nested/savepoint/retry helpers)
-- native SQL migrations through the shared `muscles-data` migration registry
+- native SQL migrations through the shared `muscles-data` registry, including
+  framework-level discovery and registry construction for installed Muscles packages
 - inspect/doctor support with machine-readable diagnostics
 
 ## Related Repositories
@@ -90,6 +91,25 @@ The adapter opens its native connection lazily on the first transaction and
 closes it with the owning `DataRuntime`. Direct `SqlDatabase` examples above
 are for standalone low-level use; application package code should resolve its
 port through `app.resource`.
+
+### Native migrations in Muscles applications
+
+The composition root configures migrations once:
+
+```python
+from muscles.data.sql import build_native_sql_migration_registry
+
+self.resource.migrations = build_native_sql_migration_registry(
+    package_classes,
+    database_url,
+)
+```
+
+The builder creates the shared registry and execution lock, discovers each
+installed package's `migrate/000[0-9]_*.py` files, and orders sources using
+`Package.dependencies`. Packages need no `migration_sources()` method or manual
+revision list. The same `app.resource.migrations` instance is used by HTTP and
+CLI integrations; migrations are not applied automatically at application startup.
 
 ```bash
 python -m venv .venv

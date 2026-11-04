@@ -7,7 +7,8 @@ Muscles SQL строится как отдельный слой данных:
 - `query.py` — декларативный контракт запросов (`QuerySpec`, filters, joins)
 - `repository.py` — CRUD + advanced query/aggregate/upsert/bulk API
 - `uow.py` — Unit of Work, nested transaction, retry helpers
-- `native_migrations.py` — нативные SQL-миграции с журналом и проверкой контрольных сумм
+- `native_migrations.py` — нативные SQL-миграции с журналом, проверкой контрольных сумм
+  и единым сборщиком реестра для установленных пакетов Muscles
 - `inspect.py` — контракт диагностики `inspect`/`doctor` с latency/schema отчётом
 - `cli.py` — AI-first CLI (`doctor`, `inspect`, `generate --sql`); миграции выполняются общим CLI приложения
 - совместим с оптимизацией DI из core (`muscles#36`): без регрессий поведения SQL CLI/runtime path.

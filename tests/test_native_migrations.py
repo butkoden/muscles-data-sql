@@ -6,6 +6,8 @@ from threading import Event, Thread
 import pytest
 
 from muscles.data.sql import SqlDatabase
+from muscles.data.migrations import MigrationRegistry
+from muscles.data.sql import build_native_sql_migration_registry
 from muscles.data.sql.native_migrations import NativeSqlMigration, NativeSqlMigrationBackend
 
 
@@ -179,3 +181,61 @@ def test_migrations_reject_undeclared_or_unsupported_dialects():
                 NativeSqlMigrationBackend(db, "example", [item], dialect="sqlite")
     finally:
         db.close()
+
+
+def test_package_migration_registration_is_discovered_and_dependency_ordered(
+    monkeypatch, tmp_path
+):
+    root = tmp_path / "migration_packages"
+    root.mkdir()
+    (root / "__init__.py").write_text("", encoding="utf-8")
+    for package_name, namespace, revision in (
+        ("accounts", "accounts", "0001"),
+        ("storage", "storage", "0001"),
+        ("workspace", "workspace", "0001"),
+        ("without_migrations", "without_migrations", None),
+    ):
+        package = root / package_name
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "main.py").write_text(
+            f"class Package:\n    namespace = {namespace!r}\n"
+            + (
+                "    dependencies = ('storage',)\n"
+                if namespace == "accounts"
+                else "    dependencies = ('accounts', 'storage')\n"
+                if namespace == "workspace"
+                else ""
+            ),
+            encoding="utf-8",
+        )
+        if revision is not None:
+            migration_package = package / "migrate"
+            migration_package.mkdir()
+            (migration_package / "__init__.py").write_text("", encoding="utf-8")
+            (migration_package / f"{revision}_initial.py").write_text(
+                f"revision = {revision!r}\n"
+                "dialects = ('sqlite',)\n"
+                "def upgrade(transaction):\n    pass\n",
+                encoding="utf-8",
+            )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    from importlib import import_module
+
+    packages = [
+        import_module(f"migration_packages.{name}.main").Package
+        for name in ("workspace", "accounts", "storage", "without_migrations")
+    ]
+    registry = build_native_sql_migration_registry(
+        packages,
+        "sqlite:///migrations.db",
+    )
+
+    ordered = registry.ordered()
+    assert [source.name for source in ordered] == ["storage", "accounts", "workspace"]
+    assert [[item.revision for item in source.backend.migrations] for source in ordered] == [
+        ["0001"],
+        ["0001"],
+        ["0001"],
+    ]

@@ -7,7 +7,8 @@ Muscles SQL is a dedicated SQL data layer:
 - `query.py`: declarative query contract (`QuerySpec`, filters, joins)
 - `repository.py`: CRUD + advanced query/aggregate/upsert/bulk API
 - `uow.py`: Unit of Work, nested transaction, retry helpers
-- `native_migrations.py`: native SQL migrations with a checksummed journal
+- `native_migrations.py`: native SQL migrations with a checksummed journal and
+  one-call registry construction for installed Muscles packages
 - `inspect.py`: inspect/doctor contract with latency/schema diagnostics
 - `cli.py`: AI-first commands (`doctor`, `inspect`, `generate --sql`); applications run migrations through the shared registry
 - compatible with core DI optimization (`muscles#36`): sql CLI/runtime path has no behavior regression.
