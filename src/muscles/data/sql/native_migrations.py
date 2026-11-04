@@ -210,7 +210,7 @@ def _register_native_sql_migrations(
     package_classes: Iterable[type],
     database_url: str | None,
     *,
-    pattern: str = "migrate/000[0-9]_*.py",
+    pattern: str = "migrations/000[0-9]_*.py",
 ) -> None:
     """Discover package migrations and derive source dependencies from package metadata."""
     from muscles.data.migrations import MigrationSource, discover_migration_modules
@@ -269,7 +269,7 @@ def build_native_sql_migration_registry(
     package_classes: Iterable[type],
     database_url: str | None,
     *,
-    pattern: str = "migrate/000[0-9]_*.py",
+    pattern: str = "migrations/000[0-9]_*.py",
 ) -> MigrationRegistry:
     """Build a registry and SQL lock, deriving source order from package dependencies."""
     from muscles.data.migrations import MigrationRegistry

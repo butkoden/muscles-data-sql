@@ -106,7 +106,7 @@ self.resource.migrations = build_native_sql_migration_registry(
 ```
 
 The builder creates the shared registry and execution lock, discovers each
-installed package's `migrate/000[0-9]_*.py` files, and orders sources using
+installed package's `migrations/000[0-9]_*.py` files by default, and orders sources using
 `Package.dependencies`. Packages need no `migration_sources()` method or manual
 revision list. The same `app.resource.migrations` instance is used by HTTP and
 CLI integrations; migrations are not applied automatically at application startup.
