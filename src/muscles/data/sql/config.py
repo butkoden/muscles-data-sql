@@ -26,7 +26,11 @@ class SqlConnectionConfig:
     def safe_url(self) -> str:
         from sqlalchemy.engine import make_url
 
-        return make_url(self.url).render_as_string(hide_password=True)
+        parsed = make_url(self.url)
+        rendered = parsed.render_as_string(hide_password=True)
+        if parsed.get_backend_name() == "sqlite" and parsed.database == ":memory:":
+            rendered = rendered.replace("%3Amemory%3A", ":memory:")
+        return rendered
 
     def to_database_config(self) -> DatabaseConfig:
         return DatabaseConfig(
