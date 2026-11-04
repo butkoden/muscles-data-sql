@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "muscles-data-sql"
+version = "2.0.0"
+description = "Muscles SQL data layer for repositories, migrations and AI-first workflow."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{ name = "Denis B.", email = "denis@butko.info" }]
+dependencies = []
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1,<4.0"]
+data = ["muscles-data>=0.2.0,<1.0.0"]
+legacy = [
+  "muscles>=1.0.0rc1,<2.0.0",
+  "muscles-data>=0.2.0,<1.0.0",
+  "SQLAlchemy>=2.0,<3.0",
+  "click>=8.1,<9.0",
+  "pydantic>=2.7,<3.0",
+]
+dev = [
+  "pytest>=8.0,<9.0",
+  "muscles-data-sql[legacy]",
+]
+
+[project.urls]
+Homepage = "https://github.com/butkoden/muscles-data-sql"
+Repository = "https://github.com/butkoden/muscles-data-sql"
+Documentation = "https://github.com/butkoden/muscles-data-sql#readme"
+Releases = "https://github.com/butkoden/muscles-data-sql/releases"
+"muscles" = "https://pypi.org/project/muscles/"
+"muscles-documents" = "https://pypi.org/project/muscles-documents/"
+"muscles-ai" = "https://pypi.org/project/muscles-ai/"
+"muscles-otel" = "https://pypi.org/project/muscles-otel/"
+"muscles-benchmarks" = "https://pypi.org/project/muscles-benchmarks/"
+
+[project.scripts]
+muscles-data-sql = "muscles.data.sql.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["muscles.data.sql*"]
