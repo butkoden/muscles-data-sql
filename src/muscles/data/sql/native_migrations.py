@@ -225,23 +225,35 @@ def _register_native_sql_migrations(
         package_name = class_module.rpartition(".")[0]
         if not package_name:
             continue
+        package_pattern = pattern
         migration_package = f"{package_name}.{'.'.join(directory_parts)}"
         try:
             migration_package_spec = find_spec(migration_package)
         except ModuleNotFoundError as exc:
             if exc.name == migration_package:
-                continue
-            raise
+                migration_package_spec = None
+            else:
+                raise
+        if migration_package_spec is None and pattern == "migrations/000[0-9]_*.py":
+            package_pattern = "migrate/000[0-9]_*.py"
+            migration_package = f"{package_name}.migrate"
+            try:
+                migration_package_spec = find_spec(migration_package)
+            except ModuleNotFoundError as exc:
+                if exc.name == migration_package:
+                    migration_package_spec = None
+                else:
+                    raise
         if migration_package_spec is None:
             continue
 
         namespace = getattr(package_class, "namespace", None)
         if not isinstance(namespace, str) or not namespace:
             raise ValueError(f"Package {package_class.__name__} has no namespace")
-        modules = discover_migration_modules(package_name, pattern=pattern)
+        modules = discover_migration_modules(package_name, pattern=package_pattern)
         if not modules:
             raise ValueError(
-                f"No SQL migrations found for package {namespace!r} matching {pattern!r}"
+                f"No SQL migrations found for package {namespace!r} matching {package_pattern!r}"
             )
         if not database_url:
             raise ValueError(
