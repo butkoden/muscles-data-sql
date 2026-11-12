@@ -6,8 +6,8 @@ tomllib = pytest.importorskip("tomllib", reason="stdlib TOML parser requires Pyt
 
 def test_lightweight_install_and_optional_integration_dependencies():
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
-    assert project["dependencies"] == []
+    assert "click>=8.1,<9.0" in project["dependencies"]
     extras = project["optional-dependencies"]
-    assert "muscles-data>=0.2.0,<1.0.0" in extras["data"]
-    assert "muscles-data>=0.2.0,<1.0.0" in extras["legacy"]
+    assert "muscles-data>=0.2.3,<1.0.0" in extras["data"]
+    assert "legacy" not in extras
     assert any(dependency.startswith("psycopg[") for dependency in extras["postgres"])

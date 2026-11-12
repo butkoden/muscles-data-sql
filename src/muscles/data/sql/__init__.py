@@ -17,13 +17,8 @@ if TYPE_CHECKING:
     from .config import DatabaseConfig
     from .config import SqlConnectionConfig
     from .connections import SqlConnectionRegistry, UnknownSqlConnection
-    from .engine import EngineManager
-    from .mapping import map_model
     from .providers import SqlResourceGeneratorProvider
     from .query import FilterClause, JoinClause, QuerySpec
-    from .repository import SqlRepository
-    from .uow import UnitOfWork
-    from .sqlalchemy_compat import text
 
 __all__ = [
     "NativeSqlMigration",
@@ -42,11 +37,6 @@ __all__ = [
     "SqlConnectionConfig",
     "SqlConnectionRegistry",
     "UnknownSqlConnection",
-    "EngineManager",
-    "map_model",
-    "SqlRepository",
-    "UnitOfWork",
-    "text",
     "QuerySpec",
     "FilterClause",
     "JoinClause",
@@ -98,26 +88,6 @@ def __getattr__(name: str):
         from .connections import UnknownSqlConnection
 
         return UnknownSqlConnection
-    if name == "EngineManager":
-        from .engine import EngineManager
-
-        return EngineManager
-    if name == "map_model":
-        from .mapping import map_model
-
-        return map_model
-    if name == "SqlRepository":
-        from .repository import SqlRepository
-
-        return SqlRepository
-    if name == "UnitOfWork":
-        from .uow import UnitOfWork
-
-        return UnitOfWork
-    if name == "text":
-        from .sqlalchemy_compat import text
-
-        return text
     if name == "QuerySpec":
         from .query import QuerySpec
 

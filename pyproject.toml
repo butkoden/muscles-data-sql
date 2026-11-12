@@ -10,21 +10,16 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [{ name = "Denis B.", email = "denis@butko.info" }]
-dependencies = []
+dependencies = ["click>=8.1,<9.0"]
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.1,<4.0"]
-data = ["muscles-data>=0.2.0,<1.0.0"]
-legacy = [
-  "muscles>=1.0.0rc1,<2.0.0",
-  "muscles-data>=0.2.0,<1.0.0",
-  "SQLAlchemy>=2.0,<3.0",
-  "click>=8.1,<9.0",
-  "pydantic>=2.7,<3.0",
-]
+data = ["muscles-data>=0.2.3,<1.0.0"]
 dev = [
   "pytest>=8.0,<9.0",
-  "muscles-data-sql[legacy]",
+  "muscles>=1.0.0rc1,<2.0.0",
+  "muscles-data>=0.2.3,<1.0.0",
+  "pydantic>=2.7,<3.0",
 ]
 
 [project.urls]

@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .config import DatabaseConfig, SqlConnectionConfig
-from .engine import EngineManager
+from .native import SqlDatabase
+from urllib.parse import unquote, urlsplit
+from time import perf_counter
 
 
 class UnknownSqlConnection(KeyError):
@@ -16,7 +18,7 @@ class UnknownSqlConnection(KeyError):
 class SqlConnectionRegistry:
     def __init__(self, configs: Iterable[SqlConnectionConfig] | None = None):
         self._configs: dict[str, SqlConnectionConfig] = {}
-        self._managers: dict[str, EngineManager] = {}
+        self._databases: dict[str, SqlDatabase] = {}
         for config in configs or ():
             self.register(config)
 
@@ -37,7 +39,9 @@ class SqlConnectionRegistry:
 
     def register(self, config: SqlConnectionConfig) -> None:
         self._configs[config.name] = config
-        self._managers.pop(config.name, None)
+        old = self._databases.pop(config.name, None)
+        if old is not None:
+            old.close()
 
     def names(self) -> list[str]:
         return sorted(self._configs)
@@ -48,22 +52,43 @@ class SqlConnectionRegistry:
         except KeyError as exc:
             raise UnknownSqlConnection(name) from exc
 
-    def manager(self, name: str = "default") -> EngineManager:
-        if name not in self._managers:
-            self._managers[name] = EngineManager(self.config(name).to_database_config())
-        return self._managers[name]
-
-    def session_factory(self, name: str = "default"):
-        return self.manager(name).session_factory
-
-    def session(self, name: str = "default"):
-        return self.manager(name).session()
+    def database(self, name: str = "default") -> SqlDatabase:
+        if name not in self._databases:
+            url = self.config(name).url
+            if url.startswith("sqlite:///"):
+                path = unquote(url[len("sqlite:///"):].split("?", 1)[0])
+                self._databases[name] = SqlDatabase.sqlite(path)
+            elif urlsplit(url).scheme in {"postgres", "postgresql", "postgresql+psycopg", "postgresql+psycopg2"}:
+                self._databases[name] = SqlDatabase.postgres(url)
+            else:
+                raise ValueError("Unsupported SQL connection URL")
+        return self._databases[name]
 
     def inspect(self, name: str = "default") -> dict[str, Any]:
-        from muscles.data.sql.inspect import inspect_sql_layer
-
         config = self.config(name)
-        report = inspect_sql_layer(self.manager(name))
+        dialect = "sqlite" if config.url.startswith("sqlite:///") else "postgresql"
+        started = perf_counter()
+        with self.database(name).transaction() as transaction:
+            transaction.fetch_one("SELECT 1 AS value")
+            if dialect == "sqlite":
+                names = transaction.fetch_all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+                tables = []
+                for row in names:
+                    table = row["name"]
+                    quoted = '"' + table.replace('"', '""') + '"'
+                    columns = transaction.fetch_all(f"PRAGMA table_info({quoted})")
+                    indexes = transaction.fetch_all(f"PRAGMA index_list({quoted})")
+                    tables.append({"name": table, "columns": [item["name"] for item in columns], "indexes": [item["name"] for item in indexes], "pk": [item["name"] for item in sorted(columns, key=lambda item: item["pk"]) if item["pk"]]})
+            else:
+                names = transaction.fetch_all("SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name")
+                tables = []
+                for row in names:
+                    table = row["table_name"]
+                    columns = transaction.fetch_all("SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = %s ORDER BY ordinal_position", (table,))
+                    indexes = transaction.fetch_all("SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND tablename = %s ORDER BY indexname", (table,))
+                    primary = transaction.fetch_all("SELECT a.attname AS name FROM pg_index i JOIN pg_class t ON t.oid = i.indrelid JOIN pg_namespace n ON n.oid = t.relnamespace JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord) ON true JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum WHERE i.indisprimary AND n.nspname = current_schema() AND t.relname = %s ORDER BY k.ord", (table,))
+                    tables.append({"name": table, "columns": [item["column_name"] for item in columns], "indexes": [item["indexname"] for item in indexes], "pk": [item["name"] for item in primary]})
+        report = {"status": "ok", "dialect": dialect, "driver": "sqlite3" if dialect == "sqlite" else "psycopg", "latency_ms": round((perf_counter() - started) * 1000, 3), "tables": tables}
         report["connection"] = config.to_contract()
         return report
 

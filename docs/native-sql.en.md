@@ -53,6 +53,5 @@ support the required thread usage; test each new backend in an integration
 environment. SQL and parameters remain native to that backend. Use
 `health_query` to provide a health check compatible with its SQL dialect.
 
-Existing SQLAlchemy-based repositories and migrations require the `legacy`
-extra. This dependency change requires a coordinated migration for existing
+SQLAlchemy-based repositories are no longer included in this package. This dependency change requires a coordinated migration for existing
 installations.

@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 from click.testing import CliRunner
@@ -22,7 +23,7 @@ def test_sql_connection_config_redacts_passwords():
     assert config.to_database_config().url == config.url
 
 
-def test_sql_connection_registry_resolves_managers_lazily_by_name():
+def test_sql_connection_registry_resolves_databases_lazily_by_name():
     registry = SqlConnectionRegistry(
         [
             SqlConnectionConfig(name="default", url="sqlite:///:memory:"),
@@ -31,12 +32,12 @@ def test_sql_connection_registry_resolves_managers_lazily_by_name():
     )
 
     assert registry.names() == ["analytics", "default"]
-    assert registry.manager("default") is registry.manager("default")
-    assert registry.manager("analytics") is not registry.manager("default")
+    assert registry.database("default") is registry.database("default")
+    assert registry.database("analytics") is not registry.database("default")
     assert registry.config("analytics").role == "read"
 
     with pytest.raises(UnknownSqlConnection, match="missing"):
-        registry.manager("missing")
+        registry.database("missing")
 
 
 def test_sql_connection_registry_inspect_includes_safe_connection_contract():
@@ -48,6 +49,28 @@ def test_sql_connection_registry_inspect_includes_safe_connection_contract():
     assert report["dialect"] == "sqlite"
     assert report["connection"]["name"] == "default"
     assert report["connection"]["url"] == "sqlite:///:memory:"
+
+
+def test_native_inspect_reports_tables_columns_indexes_and_primary_keys():
+    registry = SqlConnectionRegistry([SqlConnectionConfig(name="default", url="sqlite:///:memory:")])
+    with registry.database().transaction() as tx:
+        tx.execute('CREATE TABLE "odd table" (id INTEGER PRIMARY KEY, name TEXT)')
+        tx.execute('CREATE INDEX idx_name ON "odd table" (name)')
+    assert registry.inspect()["tables"] == [{
+        "name": "odd table", "columns": ["id", "name"], "indexes": ["idx_name"], "pk": ["id"]
+    }]
+
+
+@pytest.mark.skipif(not os.getenv("MUSCLES_SQL_TEST_POSTGRES"), reason="isolated PostgreSQL not configured")
+def test_native_postgres_inspect():
+    registry = SqlConnectionRegistry([SqlConnectionConfig(name="default", url=os.environ["MUSCLES_SQL_TEST_POSTGRES"])])
+    try:
+        report = registry.inspect()
+        assert report["status"] == "ok"
+        assert report["dialect"] == "postgresql"
+        assert isinstance(report["tables"], list)
+    finally:
+        registry.database().close()
 
 
 def test_cli_inspect_named_connection_from_config(tmp_path):

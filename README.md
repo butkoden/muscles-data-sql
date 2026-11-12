@@ -1,13 +1,6 @@
 # Muscles Data SQL
 
-Muscles SQL is a data layer package for SQL databases:
-- model-to-table mapping
-- engine and session management
-- repository CRUD and advanced query API (filters/operators/joins/aggregates)
-- transactions and Unit of Work (nested/savepoint/retry helpers)
-- native SQL migrations through the shared `muscles-data` registry, including
-  framework-level discovery and registry construction for installed Muscles packages
-- inspect/doctor support with machine-readable diagnostics
+Muscles SQL provides native DB-API transactions, policy-aware repositories, migrations and diagnostics for SQLite and PostgreSQL.
 
 ## Related Repositories
 
@@ -23,12 +16,7 @@ This low-level API is useful for standalone scripts and libraries that explicitl
 own their database lifetime. Application packages should use the shared
 `app.resource` integration below instead of constructing `SqlDatabase` objects.
 
-The lightweight SQL API has no mandatory third-party dependencies. SQLite uses
-Python's standard library; PostgreSQL requires the `postgres` extra. The
-named-resource integration requires `data`; SQLAlchemy repositories and CLI
-require `legacy`. In this checkout install from the library
-directory using `pip install -e '.[postgres]'`, `.[data]` or `.[legacy]` as
-needed. Publishing the renamed distribution is a separate step.
+SQLite uses Python's standard library. PostgreSQL requires the `postgres` extra; named-resource and policy integration requires the `data` extra. The CLI uses Click. Install with `pip install -e '.[postgres,data]'` as needed.
 
 ```python
 from muscles.data.sql import SqlDatabase
@@ -117,7 +105,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-For local development with the test and legacy dependencies:
+For local development with the test dependencies:
 
 ```bash
 pip install -e ".[dev]"
@@ -129,7 +117,7 @@ muscles-data-sql doctor --url sqlite:///./app.db
 
 `muscles-data-sql` can manage multiple SQL connections without becoming a generic
 storage registry. The registry is SQL-only: it owns SQL connection configs,
-lazy SQLAlchemy `EngineManager` instances, sessions, inspect and doctor reports.
+lazy native `SqlDatabase` instances and inspect and doctor reports.
 
 ```python
 from muscles.data.sql import SqlConnectionConfig, SqlConnectionRegistry
@@ -141,7 +129,7 @@ registry = SqlConnectionRegistry(
     ]
 )
 
-session = registry.session("analytics")
+database = registry.database("analytics")
 report = registry.inspect("analytics")
 ```
 
@@ -163,51 +151,7 @@ muscles-data-sql doctor --config sql-connections.json --all
 
 Diagnostic output uses safe URLs and does not print passwords from DSNs.
 
-## Advanced Query Example
-
-```python
-from sqlalchemy import func
-from muscles.data.sql import FilterClause, JoinClause, QuerySpec, SqlRepository
-
-spec = QuerySpec(
-    filters=[FilterClause("status", "eq", "active")],
-    joins=[JoinClause(table=orders, on=users.c.id == orders.c.user_id)],
-    select_columns=[users.c.id, func.count(orders.c.id).label("orders_total")],
-    group_by=[users.c.id],
-    order_by=[users.c.id.asc()],
-)
-rows = SqlRepository(session, users).aggregate(spec)
-```
-
 ## Data operation policies
-
-`SqlRepository` accepts the policy pipeline and a request-scoped context from
-`muscles-data`. Policy predicates are combined with caller filters using AND;
-they apply to reads, counts, updates, deletes, creates, bulk creates and upserts.
-For update/delete, predicates are part of the SQL statement. Create and changed
-values are checked before execution. Under an active policy pipeline, upsert
-uses the constrained repository path instead of a native conflict statement.
-
-```python
-from muscles.data import DataOperationContext
-from muscles.data.sql import SqlRepository
-
-repo = SqlRepository(
-    session,
-    documents,
-    policies=data_runtime.policies,
-    context=DataOperationContext(
-        subject_type="account",
-        subject_uid=account_uid,
-        attributes={"workspace_uid": workspace_uid},
-    ),
-)
-rows = repo.find({"owner_uid": account_uid}, limit=50)
-```
-
-The policy contract is backend-neutral; each adapter is responsible for
-translating predicates and enforcing them before pagination or mutation. Direct
-SQLAlchemy session use is outside this enforcement boundary.
 
 ### Native policy repository
 
