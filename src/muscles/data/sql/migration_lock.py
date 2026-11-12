@@ -1,6 +1,7 @@
 """Optional SQL-backed coordination lock for the migration registry."""
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 
 class SqlMigrationExecutionLock:
@@ -11,16 +12,12 @@ class SqlMigrationExecutionLock:
 
     @contextmanager
     def __call__(self):
-        from sqlalchemy.engine import make_url
-
-        sqlalchemy_url = self.url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
-        sqlalchemy_url = sqlalchemy_url.replace("postgresql://", "postgresql+psycopg://", 1)
-        url = make_url(sqlalchemy_url)
-        dialect = url.get_backend_name()
+        url = urlsplit(self.url)
+        dialect = url.scheme.split("+", 1)[0]
         if dialect == "sqlite":
             import fcntl
 
-            database = url.database
+            database = unquote(url.path[1:]) if url.path.startswith("/") else ""
             if not database or database == ":memory:" or database.startswith("file:"):
                 raise ValueError("SQLite migration coordinator requires a shared file, not memory or a URI")
             lock_path = Path(f"{Path(database).resolve()}.migrations.lock")
@@ -34,20 +31,18 @@ class SqlMigrationExecutionLock:
                 finally:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         elif dialect == "postgresql":
-            from sqlalchemy import create_engine, text
-            from sqlalchemy.pool import NullPool
+            import psycopg
 
-            engine = create_engine(url, poolclass=NullPool)
-            try:
-                with engine.connect() as connection:
-                    acquired = connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": 778212474}).scalar_one()
+            dsn = self.url.replace(url.scheme + "://", "postgresql://", 1)
+            with psycopg.connect(dsn, autocommit=True) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_try_advisory_lock(%s)", (778212474,))
+                    acquired = cursor.fetchone()[0]
                     if not acquired:
                         raise RuntimeError("Migration execution is locked")
                     try:
                         yield
                     finally:
-                        connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": 778212474})
-            finally:
-                engine.dispose()
+                        cursor.execute("SELECT pg_advisory_unlock(%s)", (778212474,))
         else:
             raise ValueError("Migration coordinator supports only SQLite and PostgreSQL")

@@ -12,11 +12,24 @@ class SqlTransaction:
         self._connection = connection
         self._active = True
         self._owner = get_ident()
+        self._rollback_only = False
 
     def execute(self, sql: str, parameters: Any = None) -> int:
         with self._cursor() as cursor:
             self._execute(cursor, sql, parameters)
             return cursor.rowcount
+
+    def emit_object_event(self, lifecycle, event) -> None:
+        """Dispatch an object event while this transaction is active."""
+        if not self._active:
+            raise RuntimeError("SQL transaction is no longer active")
+        if self._owner != get_ident():
+            raise RuntimeError("SQL transaction belongs to a different thread")
+        try:
+            lifecycle.emit(self, event)
+        except BaseException:
+            self._rollback_only = True
+            raise
 
     def fetch_all(self, sql: str, parameters: Any = None) -> list[dict[str, Any]]:
         with self._cursor() as cursor:
@@ -105,6 +118,8 @@ class SqlDatabase:
                     with transaction._cursor() as cursor:
                         cursor.execute(begin_sql)
                 yield transaction
+                if transaction._rollback_only:
+                    raise RuntimeError("SQL transaction cannot commit after a failed object event")
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()

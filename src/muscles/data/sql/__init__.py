@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     )
     from .drivers import SqlDriverCatalog
     from .native import SqlDatabase, SqlTransaction
+    from .native_policy import compile_operation_scope
+    from .native_repository import NativePolicyRepository, native_repository_from_runtime, native_repository_transaction
     from .model_mapper import ModelMapper
     from .config import DatabaseConfig
     from .config import SqlConnectionConfig
@@ -31,6 +33,10 @@ __all__ = [
     "SqlDriverCatalog",
     "SqlDatabase",
     "SqlTransaction",
+    "compile_operation_scope",
+    "NativePolicyRepository",
+    "native_repository_from_runtime",
+    "native_repository_transaction",
     "ModelMapper",
     "DatabaseConfig",
     "SqlConnectionConfig",
@@ -70,6 +76,12 @@ def __getattr__(name: str):
         from .native import SqlDatabase, SqlTransaction
 
         return {"SqlDatabase": SqlDatabase, "SqlTransaction": SqlTransaction}[name]
+    if name == "compile_operation_scope":
+        from .native_policy import compile_operation_scope
+        return compile_operation_scope
+    if name in {"NativePolicyRepository", "native_repository_from_runtime", "native_repository_transaction"}:
+        from . import native_repository
+        return getattr(native_repository, name)
     if name == "DatabaseConfig":
         from .config import DatabaseConfig
 

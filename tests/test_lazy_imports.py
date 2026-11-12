@@ -24,20 +24,28 @@ def test_public_exports_are_importable():
     from muscles.data.sql import EngineManager
     from muscles.data.sql import FilterClause
     from muscles.data.sql import JoinClause
+    from muscles.data.sql import NativePolicyRepository
     from muscles.data.sql import QuerySpec
     from muscles.data.sql import SqlConnectionConfig
     from muscles.data.sql import SqlConnectionRegistry
     from muscles.data.sql import SqlRepository
     from muscles.data.sql import UnitOfWork
     from muscles.data.sql import map_model
+    from muscles.data.sql import compile_operation_scope
+    from muscles.data.sql import native_repository_from_runtime
+    from muscles.data.sql import native_repository_transaction
 
     assert DatabaseConfig.__name__ == "DatabaseConfig"
     assert EngineManager.__name__ == "EngineManager"
     assert FilterClause.__name__ == "FilterClause"
     assert JoinClause.__name__ == "JoinClause"
+    assert NativePolicyRepository.__name__ == "NativePolicyRepository"
     assert QuerySpec.__name__ == "QuerySpec"
     assert SqlConnectionConfig.__name__ == "SqlConnectionConfig"
     assert SqlConnectionRegistry.__name__ == "SqlConnectionRegistry"
     assert SqlRepository.__name__ == "SqlRepository"
     assert UnitOfWork.__name__ == "UnitOfWork"
     assert callable(map_model)
+    assert callable(compile_operation_scope)
+    assert callable(native_repository_from_runtime)
+    assert callable(native_repository_transaction)

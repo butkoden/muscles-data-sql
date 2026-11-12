@@ -209,4 +209,34 @@ The policy contract is backend-neutral; each adapter is responsible for
 translating predicates and enforcing them before pagination or mutation. Direct
 SQLAlchemy session use is outside this enforcement boundary.
 
+### Native policy repository
+
+`native_repository_transaction` uses a `DataRuntime` SQL resource, its policy
+pipeline and its object lifecycle handlers. Pass the authenticated request's
+`DataOperationContext` explicitly. Use `%s` for PostgreSQL and `?` for SQLite.
+
+```python
+from muscles.data.sql import native_repository_transaction
+
+with native_repository_transaction(
+    data_runtime, "database", "documents", context=request_context,
+    object_type="example:document", placeholder="%s",
+) as repo:
+    rows = repo.list(limit=50, order_by="uid")
+```
+
+Policies must be registered with the runtime; an empty pipeline does not
+restrict access. Object creation and deletion notifications execute inside the
+same transaction when an object type is provided. Handler failures abort the
+transaction. A `RELATED_EXISTS` predicate can constrain reads and mutations by
+a related table; policies for object creation must instead use supported scalar
+conditions, because the related row may not yet exist. Unsupported conditions
+are rejected. Direct calls to `SqlTransaction.execute()` do not apply policies;
+callers must use the policy-aware repository for protected operations.
+For structured custom SQL, `compile_operation_scope` evaluates a
+`DataOperationRequest` and returns an AND condition and bound parameters. The
+caller must insert that condition into the actual read, update or delete query;
+calling the compiler alone does not enforce anything. Create operations are
+validated through the repository rather than through this SQL fragment helper.
+
 Repository: https://github.com/butkoden/muscles-data-sql
