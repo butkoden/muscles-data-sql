@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "muscles-data-sql"
-version = "2.1.0"
+version = "2.1.1"
 description = "Muscles SQL data layer for repositories, migrations and AI-first workflow."
 readme = "README.md"
 license = {text = "MIT"}
