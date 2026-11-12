@@ -55,6 +55,22 @@ def test_changed_migration_or_missing_downgrade_fails_closed(tmp_path):
         db.close()
 
 
+def test_explicit_compatible_checksum_preserves_existing_history(tmp_path):
+    db = SqlDatabase.sqlite(tmp_path / "test.sqlite")
+    try:
+        old = migration(checksum="original")
+        NativeSqlMigrationBackend(db, "example", [old], dialect="sqlite").upgrade()
+        compatible = NativeSqlMigration("001", "updated", old.upgrade, old.downgrade,
+                                        dialects=("sqlite",), compatible_checksums=("original",))
+        assert NativeSqlMigrationBackend(db, "example", [compatible], dialect="sqlite").status()["current"] == ["001"]
+        unrelated = NativeSqlMigration("001", "updated", old.upgrade, old.downgrade,
+                                       dialects=("sqlite",), compatible_checksums=("different",))
+        with pytest.raises(ValueError, match="changed"):
+            NativeSqlMigrationBackend(db, "example", [unrelated], dialect="sqlite").status()
+    finally:
+        db.close()
+
+
 def test_failed_migration_rolls_back_schema_and_journal(tmp_path):
     db = SqlDatabase.sqlite(tmp_path / "test.sqlite")
 

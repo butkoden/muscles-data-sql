@@ -25,6 +25,7 @@ class NativeSqlMigration:
     downgrade: Callable[[SqlTransaction], None] | None = None
     dialects: tuple[str, ...] = ()
     source_path: str | None = None
+    compatible_checksums: tuple[str, ...] = ()
 
     @classmethod
     def from_module(cls, module: ModuleType) -> NativeSqlMigration:
@@ -36,7 +37,8 @@ class NativeSqlMigration:
         if loaded_checksum != checksum:
             raise ValueError("Migration file changed after module discovery")
         return cls(module.revision, checksum,
-                   module.upgrade, getattr(module, "downgrade", None), getattr(module, "dialects", ()), str(path))
+                   module.upgrade, getattr(module, "downgrade", None), getattr(module, "dialects", ()), str(path),
+                   getattr(module, "compatible_checksums", ()))
 
 
 class NativeSqlMigrationBackend:
@@ -57,6 +59,8 @@ class NativeSqlMigrationBackend:
             raise ValueError("Migrations must have unique ordered revisions, checksums and callable operations")
         if any(not isinstance(item.dialects, tuple) or dialect not in item.dialects for item in migrations):
             raise ValueError("Every migration must explicitly support the selected SQL dialect")
+        if any(not isinstance(item.compatible_checksums, tuple) or any(not isinstance(value, str) or not value for value in item.compatible_checksums) for item in migrations):
+            raise ValueError("Compatible checksums must be nonempty strings")
         self.db, self.source, self.migrations, self.dialect = db, source, tuple(migrations), dialect
         self._param = "?" if dialect == "sqlite" else "%s"
 
@@ -91,7 +95,7 @@ class NativeSqlMigrationBackend:
         expected = self.migrations[:len(rows)]
         if len(rows) > len(self.migrations) or [row["revision"] for row in rows] != [item.revision for item in expected]:
             raise ValueError("Migration history is missing, unknown or out of order")
-        if any(row["checksum"] != item.checksum for row, item in zip(rows, expected)):
+        if any(row["checksum"] != item.checksum and row["checksum"] not in item.compatible_checksums for row, item in zip(rows, expected)):
             raise ValueError("An applied migration has changed")
         return [row["revision"] for row in rows]
 

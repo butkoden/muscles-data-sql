@@ -99,6 +99,12 @@ installed package's `migrations/000[0-9]_*.py` files by default, and orders sour
 revision list. The same `app.resource.migrations` instance is used by HTTP and
 CLI integrations; migrations are not applied automatically at application startup.
 
+For an audited compatibility change to an already applied migration, a migration
+module may declare `compatible_checksums` as a tuple of exact previously released
+checksums. The backend accepts only its current checksum or one explicitly listed
+checksum; it still rejects other changes and changes after discovery. Use this only
+when the old and new migration paths are intentionally compatible.
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -152,6 +158,9 @@ muscles-data-sql doctor --config sql-connections.json --all
 Diagnostic output uses safe URLs and does not print passwords from DSNs.
 
 ## Data operation policies
+
+Practical guide: [English](docs/data-policies.en.md) · [Русский](docs/data-policies.ru.md).
+The complete [transactional scope example](examples/scoped_lifecycle.py) runs locally on SQLite.
 
 ### Native policy repository
 
